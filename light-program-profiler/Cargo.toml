@@ -1,0 +1,23 @@
+[package]
+name = "light-program-profiler"
+version.workspace = true
+edition.workspace = true
+
+[features]
+profile-program = ["light-profiler-macro/profile-program"]
+profile-heap = ["light-profiler-macro/profile-heap"]
+inline = ["light-profiler-macro/inline"]
+
+[dependencies]
+light-profiler-macro.workspace = true
+
+[dev-dependencies]
+solana-program = "2.2.1"
+litesvm = "0.6.1"
+
+[lints.rust.unexpected_cfgs]
+level = "allow"
+check-cfg = [
+    'cfg(target_os, values("solana"))',
+    'cfg(feature, values("frozen-abi", "no-entrypoint"))',
+]

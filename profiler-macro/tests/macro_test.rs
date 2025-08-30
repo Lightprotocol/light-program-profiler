@@ -1,4 +1,4 @@
-use light_profiler::profile;
+use light_profiler_macro::profile;
 
 struct TestStruct;
 
