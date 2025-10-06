@@ -12,7 +12,7 @@ fn test_profiled_program() {
     // Deploy the test program
     let program_id = Pubkey::new_unique();
     let program_bytes = include_bytes!("../../target/deploy/test_program.so");
-    svm.add_program(program_id, program_bytes);
+    svm.add_program(program_id, program_bytes).unwrap();
 
     // Create payer account
     let payer = Keypair::new();

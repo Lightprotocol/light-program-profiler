@@ -35,7 +35,6 @@ pub fn log_compute_units_end_with_heap(id: &str, id_len: u64, heap_value: u64) {
 
 #[cfg(target_os = "solana")]
 unsafe extern "C" {
-    #[inline(always)]
     fn sol_log_compute_units_start(
         id_addr: u64,
         id_len: u64,
@@ -48,7 +47,6 @@ unsafe extern "C" {
 #[cfg(target_os = "solana")]
 unsafe extern "C" {
 
-    #[inline(always)]
     fn sol_log_compute_units_end(
         id_addr: u64,
         id_len: u64,

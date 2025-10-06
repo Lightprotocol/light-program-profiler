@@ -3,19 +3,19 @@ members = ["light-program-profiler", "profiler-macro", "test-program"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 [workspace.dependencies]
 syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
-light-profiler-macro = { version = "0.1.0", path = "profiler-macro" }
-light-program-profiler = { version = "0.1.0", path = "light-program-profiler" }
+light-profiler-macro = { version = "0.1.1", path = "profiler-macro" }
+light-program-profiler = { version = "0.1.1", path = "light-program-profiler" }
 
 
 [patch.crates-io]
 # Profiling logs and state is handled here
-solana-program-runtime = { git = "https://github.com/Lightprotocol/agave", rev = "580e29f03e4176a4a5525abc188a948c6595c47f" }
+solana-program-runtime = { git = "https://github.com/Lightprotocol/agave", rev = "be34dc76559e14921a2c8610f2fa2402bf0684bb" }
 # Profiling syscalls are defined here
-solana-bpf-loader-program = { git = "https://github.com/Lightprotocol/agave", rev = "580e29f03e4176a4a5525abc188a948c6595c47f" }
+solana-bpf-loader-program = { git = "https://github.com/Lightprotocol/agave", rev = "be34dc76559e14921a2c8610f2fa2402bf0684bb" }

@@ -15,10 +15,6 @@ inline = ["light-profiler-macro/inline"]
 [dependencies]
 light-profiler-macro.workspace = true
 
-[dev-dependencies]
-solana-program = "2.2.1"
-litesvm = "0.6.1"
-
 [lints.rust.unexpected_cfgs]
 level = "allow"
 check-cfg = [
