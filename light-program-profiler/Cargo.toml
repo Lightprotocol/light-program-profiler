@@ -2,6 +2,8 @@
 name = "light-program-profiler"
 version.workspace = true
 edition.workspace = true
+description = "Profiler macros with custom profiler syscalls for Solana programs"
+license = "Apache-2.0"
 
 [features]
 profile-program = ["light-profiler-macro/profile-program"]
