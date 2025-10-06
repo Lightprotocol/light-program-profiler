@@ -4,8 +4,8 @@
 Profiler macros with custom profiler syscalls.
 
 solana crate versions:
-- `2.2.1`
-- compatible with litesvm `0.6,1`
+- `2.3`
+- compatible with litesvm `0.7`
 
 ```
 [patch.crates-io]
