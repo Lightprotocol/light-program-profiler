@@ -35,6 +35,7 @@ pub fn profile(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[cfg(all(target_os = "solana", feature = "profile-program"))]
             {
                 extern "C" {
+                    #[inline(always)]
                     fn sol_log_compute_units_start(id_addr: u64, id_len: u64, heap_value: u64, with_heap: u64, _arg5: u64);
                 }
                 // Dynamic padding calculated at compile time
@@ -68,6 +69,7 @@ pub fn profile(_attr: TokenStream, item: TokenStream) -> TokenStream {
                    #[cfg(all(target_os = "solana", feature = "profile-program"))]
                    {
                        extern "C" {
+                           #[inline(always)]
                            fn sol_log_compute_units_end(id_addr: u64, id_len: u64, heap_value: u64, with_heap: u64, _arg5: u64);
                        }
                        // Dynamic padding calculated at compile time
