@@ -15,8 +15,7 @@ fn test_profiled_program() {
         &mollusk_svm::program::loader_keys::LOADER_V3,
     );
 
-    let instruction =
-        solana_instruction::Instruction::new_with_bytes(program_id, &[5], vec![]);
+    let instruction = solana_instruction::Instruction::new_with_bytes(program_id, &[5], vec![]);
 
     mollusk.process_and_validate_instruction(&instruction, &[], &[Check::success()]);
 

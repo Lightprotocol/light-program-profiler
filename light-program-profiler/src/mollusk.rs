@@ -199,7 +199,9 @@ declare_builtin_function!(
         let buf = translate_slice(memory_mapping, id_addr, id_len)?;
         let id = std::str::from_utf8(buf)?.to_string();
         PROFILING_STATE.with(|state| {
-            state.borrow_mut().start(id, current_cu, heap_value, with_heap != 0);
+            state
+                .borrow_mut()
+                .start(id, current_cu, heap_value, with_heap != 0);
         });
         Ok(0)
     }
@@ -220,7 +222,9 @@ declare_builtin_function!(
         let buf = translate_slice(memory_mapping, id_addr, id_len)?;
         let id = std::str::from_utf8(buf)?;
         PROFILING_STATE.with(|state| {
-            let _ = state.borrow_mut().end(id, current_cu, heap_value, with_heap != 0);
+            let _ = state
+                .borrow_mut()
+                .end(id, current_cu, heap_value, with_heap != 0);
         });
         Ok(0)
     }
@@ -244,10 +248,7 @@ pub fn register_profiling_syscalls(mollusk: &mut mollusk_svm::Mollusk) {
     mollusk
         .program_cache
         .program_runtime_environment
-        .register_function(
-            "sol_log_compute_units_end",
-            SyscallLogComputeUnitsEnd::vm,
-        )
+        .register_function("sol_log_compute_units_end", SyscallLogComputeUnitsEnd::vm)
         .unwrap();
 }
 
@@ -294,15 +295,15 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
 /// # Example
 ///
 /// ```rust,no_run
-/// use std::collections::{BTreeMap, HashMap};
+/// use std::collections::HashMap;
 /// use light_program_profiler::mollusk::{
 ///     register_profiling_syscalls, take_profiling_results,
-///     extract_category_and_file, write_categorized_readme, ReadmeConfig,
+///     extract_category_and_file, write_categorized_readme,
+///     BenchmarkEntry, BenchmarkResults, ReadmeConfig,
 /// };
 /// use mollusk_svm::Mollusk;
 /// use solana_pubkey::Pubkey;
 ///
-/// // 1. Set up Mollusk with profiling syscalls
 /// let program_id = Pubkey::new_unique();
 /// let mut mollusk = Mollusk::default();
 /// register_profiling_syscalls(&mut mollusk);
@@ -312,9 +313,7 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
 ///     &mollusk_svm::program::loader_keys::LOADER_V3,
 /// );
 ///
-/// // 2. Execute instructions and collect results
-/// let mut results: BTreeMap<String, BTreeMap<String, Vec<(String, String, String)>>> =
-///     BTreeMap::new();
+/// let mut results = BenchmarkResults::new();
 ///
 /// let instruction = solana_instruction::Instruction::new_with_bytes(
 ///     program_id, &[0, 0], vec![],
@@ -328,10 +327,13 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
 ///         .or_default()
 ///         .entry(filename)
 ///         .or_default()
-///         .push((func_name, cu_consumed.to_string(), file_location));
+///         .push(BenchmarkEntry {
+///             func_name,
+///             cu_value: cu_consumed.to_string(),
+///             file_location,
+///         });
 /// }
 ///
-/// // 3. Generate README
 /// let config = ReadmeConfig {
 ///     title: "My Program Benchmarks".to_string(),
 ///     description: "CU benchmarks for my Solana program.".to_string(),
@@ -360,8 +362,7 @@ pub fn extract_category_and_file(file_location: &str) -> (String, String) {
         return ("baseline".to_string(), "lib".to_string());
     }
 
-    if file_location.starts_with("src/") {
-        let without_src = &file_location[4..];
+    if let Some(without_src) = file_location.strip_prefix("src/") {
         let path_parts: Vec<&str> = without_src.split('/').collect();
 
         if path_parts.len() >= 2 {
@@ -410,13 +411,19 @@ fn add_indentation(text: &str, level: usize) -> String {
     format!("{}{}", indent, text)
 }
 
+/// A single benchmark entry: one profiled function's result.
+#[derive(Debug, Clone)]
+pub struct BenchmarkEntry {
+    pub func_name: String,
+    pub cu_value: String,
+    pub file_location: String,
+}
+
+/// Benchmark results organized as category -> file_stem -> entries.
+pub type BenchmarkResults = BTreeMap<String, BTreeMap<String, Vec<BenchmarkEntry>>>;
+
 /// Write a categorized README.md from benchmark results.
-///
-/// `results` maps category -> file_stem -> Vec<(func_name, cu_value_str, file_location)>
-pub fn write_categorized_readme(
-    config: &ReadmeConfig,
-    mut results: BTreeMap<String, BTreeMap<String, Vec<(String, String, String)>>>,
-) {
+pub fn write_categorized_readme(config: &ReadmeConfig, mut results: BenchmarkResults) {
     let mut readme = OpenOptions::new()
         .create(true)
         .write(true)
@@ -525,8 +532,8 @@ pub fn write_categorized_readme(
     let mut baseline_cu: u64 = 0;
     if let Some(baseline_files) = results.get("baseline") {
         if let Some(first_file_results) = baseline_files.values().next() {
-            if let Some((_, cu_str, _)) = first_file_results.first() {
-                baseline_cu = cu_str.parse::<u64>().unwrap_or(0);
+            if let Some(entry) = first_file_results.first() {
+                baseline_cu = entry.cu_value.parse::<u64>().unwrap_or(0);
             }
         }
     }
@@ -552,10 +559,17 @@ pub fn write_categorized_readme(
             writeln!(readme, "{}", table_header).unwrap();
             writeln!(readme, "{}", table_separator).unwrap();
 
-            for (func_name, cu_value, file_location) in file_results {
-                let github_link = make_github_link(&func_name, &file_location, &config.github_base_url);
+            for entry in file_results {
+                let github_link = make_github_link(
+                    &entry.func_name,
+                    &entry.file_location,
+                    &config.github_base_url,
+                );
                 let table_row = add_indentation(
-                    &format!("| {:<180} | {:<11} | {:<11} |", github_link, cu_value, "N/A"),
+                    &format!(
+                        "| {:<180} | {:<11} | {:<11} |",
+                        github_link, entry.cu_value, "N/A"
+                    ),
                     1,
                 );
                 writeln!(readme, "{}", table_row).unwrap();
@@ -583,16 +597,23 @@ pub fn write_categorized_readme(
             writeln!(readme, "{}", table_header).unwrap();
             writeln!(readme, "{}", table_separator).unwrap();
 
-            for (func_name, cu_value, file_location) in file_results {
-                let github_link = make_github_link(&func_name, &file_location, &config.github_base_url);
-                let cu_consumed = cu_value.parse::<u64>().unwrap_or(0);
+            for entry in file_results {
+                let github_link = make_github_link(
+                    &entry.func_name,
+                    &entry.file_location,
+                    &config.github_base_url,
+                );
+                let cu_consumed = entry.cu_value.parse::<u64>().unwrap_or(0);
                 let cu_adjusted = if cu_consumed >= baseline_cu {
                     (cu_consumed - baseline_cu).to_string()
                 } else {
                     "0".to_string()
                 };
                 let table_row = add_indentation(
-                    &format!("| {:<180} | {:<11} | {:<11} |", github_link, cu_value, cu_adjusted),
+                    &format!(
+                        "| {:<180} | {:<11} | {:<11} |",
+                        github_link, entry.cu_value, cu_adjusted
+                    ),
                     1,
                 );
                 writeln!(readme, "{}", table_row).unwrap();
