@@ -12,10 +12,3 @@ quote = "1"
 proc-macro2 = "1"
 light-profiler-macro = { version = "0.1.1", path = "profiler-macro" }
 light-program-profiler = { version = "0.1.1", path = "light-program-profiler" }
-
-
-[patch.crates-io]
-# Profiling logs and state is handled here
-solana-program-runtime = { git = "https://github.com/Lightprotocol/agave", rev = "be34dc76559e14921a2c8610f2fa2402bf0684bb" }
-# Profiling syscalls are defined here
-solana-bpf-loader-program = { git = "https://github.com/Lightprotocol/agave", rev = "be34dc76559e14921a2c8610f2fa2402bf0684bb" }

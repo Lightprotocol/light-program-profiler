@@ -1,6 +1,9 @@
 #![allow(unused_variables)]
 pub use light_profiler_macro::profile;
 
+#[cfg(feature = "mollusk")]
+pub mod mollusk;
+
 #[inline(always)]
 pub fn log_compute_units_start(id: &str, id_len: u64) {
     #[cfg(target_os = "solana")]

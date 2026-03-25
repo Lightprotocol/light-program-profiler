@@ -11,9 +11,12 @@ homepage = "https://github.com/Lightprotocol/light-program-profiler"
 profile-program = ["light-profiler-macro/profile-program"]
 profile-heap = ["light-profiler-macro/profile-heap"]
 inline = ["light-profiler-macro/inline"]
+mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm"]
 
 [dependencies]
 light-profiler-macro.workspace = true
+solana-program-runtime = { version = "2.3", optional = true }
+mollusk-svm = { version = "0.3.0", optional = true }
 
 [lints.rust.unexpected_cfgs]
 level = "allow"
