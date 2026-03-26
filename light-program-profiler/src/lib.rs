@@ -1,6 +1,9 @@
 #![allow(unused_variables)]
 pub use light_profiler_macro::profile;
 
+#[cfg(feature = "report")]
+pub mod report;
+
 #[cfg(feature = "mollusk")]
 pub mod mollusk;
 

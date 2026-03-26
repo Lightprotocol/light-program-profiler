@@ -258,6 +258,7 @@ pub fn register_profiling_syscalls(mollusk: &mut mollusk_svm::Mollusk) {
 
 /// Take profiling results, post-process, and clear state for next instruction.
 /// Returns Vec of (func_name, cu_consumed, file_location).
+#[deprecated(note = "use take_profiling_entries() which returns Vec<ProfileEntry>")]
 pub fn take_profiling_results() -> Vec<(String, u64, String)> {
     PROFILING_STATE.with(|state| {
         let mut state = state.borrow_mut();
@@ -279,6 +280,40 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
                     (entry.id.clone(), String::new())
                 };
                 (func_name, entry.total_cu, file_location)
+            })
+            .collect();
+        state.clear();
+        results
+    })
+}
+
+/// Take profiling results as `ProfileEntry` structs with total and net CU.
+/// Post-processes to compute net CU (total minus children), then clears state.
+pub fn take_profiling_entries() -> Vec<crate::report::ProfileEntry> {
+    PROFILING_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        if state.completed_count() == 0 {
+            return vec![];
+        }
+        state.post_process();
+        let results = state
+            .get_completed()
+            .iter()
+            .map(|entry| {
+                let (func_name, file_location) = if let Some(pos) = entry.id.find('\n') {
+                    (
+                        entry.id[..pos].to_string(),
+                        entry.id[pos + 1..].trim().to_string(),
+                    )
+                } else {
+                    (entry.id.clone(), String::new())
+                };
+                crate::report::ProfileEntry {
+                    func_name,
+                    file_location,
+                    total_cu: entry.total_cu,
+                    net_cu: entry.net_cu,
+                }
             })
             .collect();
         state.clear();
