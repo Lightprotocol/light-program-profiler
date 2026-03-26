@@ -124,20 +124,35 @@ impl ProfilingState {
         for i in 0..self.completed.len() {
             let mut children_cu = 0;
             let mut children_heap = 0;
-            let entry = &self.completed[i];
+            let entry_start = self.completed[i].start_sequence;
+            let entry_end = self.completed[i].end_sequence;
 
-            for other in &self.completed {
-                if other.start_sequence > entry.start_sequence
-                    && other.end_sequence < entry.end_sequence
-                {
-                    children_cu += other.total_cu;
-                    if let Some(ref other_heap) = other.heap {
-                        children_heap += other_heap.total_heap;
+            for j in 0..self.completed.len() {
+                if i == j {
+                    continue;
+                }
+                let other = &self.completed[j];
+                // Check if other is a descendant of entry
+                if other.start_sequence > entry_start && other.end_sequence < entry_end {
+                    // Check if other is a DIRECT child (no intermediate ancestor)
+                    let is_direct = !self.completed.iter().enumerate().any(|(k, mid)| {
+                        k != i
+                            && k != j
+                            && mid.start_sequence > entry_start
+                            && mid.end_sequence < entry_end
+                            && other.start_sequence > mid.start_sequence
+                            && other.end_sequence < mid.end_sequence
+                    });
+                    if is_direct {
+                        children_cu += other.total_cu;
+                        if let Some(ref other_heap) = other.heap {
+                            children_heap += other_heap.total_heap;
+                        }
                     }
                 }
             }
 
-            self.completed[i].net_cu = entry.total_cu.saturating_sub(children_cu);
+            self.completed[i].net_cu = self.completed[i].total_cu.saturating_sub(children_cu);
             if let Some(ref mut heap) = self.completed[i].heap {
                 heap.net_heap = heap.total_heap.saturating_sub(children_heap);
             }
