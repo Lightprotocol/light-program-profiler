@@ -77,46 +77,38 @@ impl CuBenchmark {
     }
 
     /// Write the markdown report to `config.output_path`.
-    pub fn generate(&self) {
+    pub fn generate(&self) -> std::io::Result<()> {
         let mut f = OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
-            .open(&self.config.output_path)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to create {}: {}",
-                    self.config.output_path, e
-                )
-            });
+            .open(&self.config.output_path)?;
 
         // Header
         if !self.config.title.is_empty() {
-            writeln!(f, "# {}\n", self.config.title).unwrap();
+            writeln!(f, "# {}\n", self.config.title)?;
         }
         if !self.config.description.is_empty() {
-            writeln!(f, "{}\n", self.config.description).unwrap();
+            writeln!(f, "{}\n", self.config.description)?;
         }
         if let Some(cmd) = &self.config.regenerate_command {
-            writeln!(f, "Regenerate with `{}`.\n", cmd).unwrap();
+            writeln!(f, "Regenerate with `{}`.\n", cmd)?;
         }
 
         // Definitions
-        writeln!(f, "## Definitions\n").unwrap();
+        writeln!(f, "## Definitions\n")?;
         writeln!(
             f,
             "- **Total CU**: Compute units consumed by the function including all children"
-        )
-        .unwrap();
+        )?;
         writeln!(
             f,
             "- **Net CU**: Compute units consumed by the function itself (excluding children)\n"
-        )
-        .unwrap();
+        )?;
 
         // Table of contents
-        writeln!(f, "## Table of Contents\n").unwrap();
-        self.write_toc(&mut f);
+        writeln!(f, "## Table of Contents\n")?;
+        self.write_toc(&mut f)?;
 
         // Compute column width
         let func_width = self.config.column_width.unwrap_or_else(|| {
@@ -131,10 +123,10 @@ impl CuBenchmark {
         // Sections
         for (i, (name, entries)) in self.results.iter().enumerate() {
             let display_name = self.display_name(name);
-            writeln!(f, "## {}. {}\n", i + 1, display_name).unwrap();
+            writeln!(f, "## {}. {}\n", i + 1, display_name)?;
 
             if entries.is_empty() {
-                writeln!(f, "_No profiling data collected._\n").unwrap();
+                writeln!(f, "_No profiling data collected._\n")?;
                 continue;
             }
 
@@ -145,8 +137,7 @@ impl CuBenchmark {
                 "Total CU",
                 "Net CU",
                 fw = func_width
-            )
-            .unwrap();
+            )?;
             writeln!(
                 f,
                 "| {:-<fw$} | {:-<10} | {:-<10} |",
@@ -154,8 +145,7 @@ impl CuBenchmark {
                 "",
                 "",
                 fw = func_width
-            )
-            .unwrap();
+            )?;
 
             for entry in entries {
                 let func_display = if !self.config.github_base_url.is_empty()
@@ -177,17 +167,16 @@ impl CuBenchmark {
                     format_thousands(entry.total_cu),
                     format_thousands(entry.net_cu),
                     fw = func_width,
-                )
-                .unwrap();
+                )?;
             }
-            writeln!(f).unwrap();
+            writeln!(f)?;
         }
+        Ok(())
     }
 
-    fn write_toc(&self, f: &mut impl Write) {
+    fn write_toc(&self, f: &mut impl Write) -> std::io::Result<()> {
         let has_cu_column = self.config.toc_summary_function.is_some();
 
-        // Pre-compute entries
         let toc_entries: Vec<(usize, String, Option<String>)> = self
             .results
             .iter()
@@ -223,42 +212,31 @@ impl CuBenchmark {
             writeln!(
                 f,
                 "| {:<3} | {:<wl$} | {:>wc$} |",
-                "#",
-                "Instruction",
-                "CU",
-                wl = max_link,
-                wc = max_cu
-            )
-            .unwrap();
+                "#", "Instruction", "CU",
+                wl = max_link, wc = max_cu
+            )?;
             writeln!(
                 f,
                 "| {:-<3} | {:-<wl$} | {:-<wc$} |",
-                "",
-                "",
-                "",
-                wl = max_link,
-                wc = max_cu
-            )
-            .unwrap();
+                "", "", "",
+                wl = max_link, wc = max_cu
+            )?;
             for (num, link, cu) in &toc_entries {
                 let cu_str = cu.as_deref().unwrap_or("-");
                 writeln!(
                     f,
                     "| {:<3} | {:<wl$} | {:>wc$} |",
-                    num,
-                    link,
-                    cu_str,
-                    wl = max_link,
-                    wc = max_cu
-                )
-                .unwrap();
+                    num, link, cu_str,
+                    wl = max_link, wc = max_cu
+                )?;
             }
         } else {
             for (num, link, _) in &toc_entries {
-                writeln!(f, "{}. {}", num, link).unwrap();
+                writeln!(f, "{}. {}", num, link)?;
             }
         }
-        writeln!(f).unwrap();
+        writeln!(f)?;
+        Ok(())
     }
 
     fn display_name(&self, name: &str) -> String {

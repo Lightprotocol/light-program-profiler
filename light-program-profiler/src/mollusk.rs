@@ -256,35 +256,13 @@ pub fn register_profiling_syscalls(mollusk: &mut mollusk_svm::Mollusk) {
 // Profiling result extraction
 // ---------------------------------------------------------------------------
 
-/// Take profiling results, post-process, and clear state for next instruction.
-/// Returns Vec of (func_name, cu_consumed, file_location).
-#[deprecated(note = "use take_profiling_entries() which returns Vec<ProfileEntry>")]
-pub fn take_profiling_results() -> Vec<(String, u64, String)> {
-    PROFILING_STATE.with(|state| {
-        let mut state = state.borrow_mut();
-        if state.completed_count() == 0 {
-            return vec![];
-        }
-        state.post_process();
-        let results = state
-            .get_completed()
-            .iter()
-            .map(|entry| {
-                // PROFILE_ID format: "func_name\n        src/path/file.rs:line        "
-                let (func_name, file_location) = if let Some(pos) = entry.id.find('\n') {
-                    (
-                        entry.id[..pos].to_string(),
-                        entry.id[pos + 1..].trim().to_string(),
-                    )
-                } else {
-                    (entry.id.clone(), String::new())
-                };
-                (func_name, entry.total_cu, file_location)
-            })
-            .collect();
-        state.clear();
-        results
-    })
+/// Parse PROFILE_ID format: "func_name\n        src/path/file.rs:line        "
+fn parse_profile_id(id: &str) -> (String, String) {
+    if let Some(pos) = id.find('\n') {
+        (id[..pos].to_string(), id[pos + 1..].trim().to_string())
+    } else {
+        (id.to_string(), String::new())
+    }
 }
 
 /// Take profiling results as `ProfileEntry` structs with total and net CU.
@@ -300,14 +278,7 @@ pub fn take_profiling_entries() -> Vec<crate::report::ProfileEntry> {
             .get_completed()
             .iter()
             .map(|entry| {
-                let (func_name, file_location) = if let Some(pos) = entry.id.find('\n') {
-                    (
-                        entry.id[..pos].to_string(),
-                        entry.id[pos + 1..].trim().to_string(),
-                    )
-                } else {
-                    (entry.id.clone(), String::new())
-                };
+                let (func_name, file_location) = parse_profile_id(&entry.id);
                 crate::report::ProfileEntry {
                     func_name,
                     file_location,
