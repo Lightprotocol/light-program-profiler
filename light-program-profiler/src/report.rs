@@ -148,17 +148,16 @@ impl CuBenchmark {
             )?;
 
             for entry in entries {
-                let func_display = if !self.config.github_base_url.is_empty()
-                    && !entry.file_location.is_empty()
-                {
-                    make_github_link(
-                        &entry.func_name,
-                        &entry.file_location,
-                        &self.config.github_base_url,
-                    )
-                } else {
-                    format!("`{}`", entry.func_name)
-                };
+                let func_display =
+                    if !self.config.github_base_url.is_empty() && !entry.file_location.is_empty() {
+                        make_github_link(
+                            &entry.func_name,
+                            &entry.file_location,
+                            &self.config.github_base_url,
+                        )
+                    } else {
+                        format!("`{}`", entry.func_name)
+                    };
 
                 writeln!(
                     f,
@@ -212,22 +211,31 @@ impl CuBenchmark {
             writeln!(
                 f,
                 "| {:<3} | {:<wl$} | {:>wc$} |",
-                "#", "Instruction", "CU",
-                wl = max_link, wc = max_cu
+                "#",
+                "Instruction",
+                "CU",
+                wl = max_link,
+                wc = max_cu
             )?;
             writeln!(
                 f,
                 "| {:-<3} | {:-<wl$} | {:-<wc$} |",
-                "", "", "",
-                wl = max_link, wc = max_cu
+                "",
+                "",
+                "",
+                wl = max_link,
+                wc = max_cu
             )?;
             for (num, link, cu) in &toc_entries {
                 let cu_str = cu.as_deref().unwrap_or("-");
                 writeln!(
                     f,
                     "| {:<3} | {:<wl$} | {:>wc$} |",
-                    num, link, cu_str,
-                    wl = max_link, wc = max_cu
+                    num,
+                    link,
+                    cu_str,
+                    wl = max_link,
+                    wc = max_cu
                 )?;
             }
         } else {
