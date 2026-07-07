@@ -11,6 +11,16 @@ pub struct ProfileEntry {
     pub net_cu: u64,
 }
 
+/// A custom table rendered inside an instruction's section, after the CU
+/// table. The title renders as bold text (not a heading), so it produces no
+/// anchor or table-of-contents entry.
+#[derive(Debug, Clone)]
+pub struct SectionTable {
+    pub title: String,
+    pub headers: Vec<String>,
+    pub rows: Vec<Vec<String>>,
+}
+
 /// Configuration for markdown report generation.
 pub struct ReadmeConfig {
     pub title: String,
@@ -49,6 +59,7 @@ impl Default for ReadmeConfig {
 pub struct CuBenchmark {
     config: ReadmeConfig,
     results: BTreeMap<String, Vec<ProfileEntry>>,
+    tables: BTreeMap<String, Vec<SectionTable>>,
 }
 
 impl CuBenchmark {
@@ -56,6 +67,7 @@ impl CuBenchmark {
         Self {
             config,
             results: BTreeMap::new(),
+            tables: BTreeMap::new(),
         }
     }
 
@@ -74,6 +86,13 @@ impl CuBenchmark {
             .entry(name.to_string())
             .or_default()
             .extend(entries);
+    }
+
+    /// Append a custom table to `name`'s section, rendered after the CU table.
+    /// Tables render in insertion order; a `name` without CU entries still gets
+    /// its own section.
+    pub fn add_table(&mut self, name: &str, table: SectionTable) {
+        self.tables.entry(name.to_string()).or_default().push(table);
     }
 
     /// Write the markdown report to `config.output_path`.
@@ -121,35 +140,40 @@ impl CuBenchmark {
         });
 
         // Sections
-        for (i, (name, entries)) in self.results.iter().enumerate() {
+        for (i, name) in self.section_names().into_iter().enumerate() {
             let display_name = self.display_name(name);
             writeln!(f, "## {}. {}\n", i + 1, display_name)?;
 
-            if entries.is_empty() {
+            let entries = self.results.get(name).map(Vec::as_slice).unwrap_or(&[]);
+            let tables = self.tables.get(name).map(Vec::as_slice).unwrap_or(&[]);
+
+            if entries.is_empty() && tables.is_empty() {
                 writeln!(f, "_No profiling data collected._\n")?;
                 continue;
             }
 
-            writeln!(
-                f,
-                "| {:<fw$} | {:>10} | {:>10} |",
-                "Function",
-                "Total CU",
-                "Net CU",
-                fw = func_width
-            )?;
-            writeln!(
-                f,
-                "| {:-<fw$} | {:-<10} | {:-<10} |",
-                "",
-                "",
-                "",
-                fw = func_width
-            )?;
+            if !entries.is_empty() {
+                writeln!(
+                    f,
+                    "| {:<fw$} | {:>10} | {:>10} |",
+                    "Function",
+                    "Total CU",
+                    "Net CU",
+                    fw = func_width
+                )?;
+                writeln!(
+                    f,
+                    "| {:-<fw$} | {:-<10} | {:-<10} |",
+                    "",
+                    "",
+                    "",
+                    fw = func_width
+                )?;
 
-            for entry in entries {
-                let func_display =
-                    if !self.config.github_base_url.is_empty() && !entry.file_location.is_empty() {
+                for entry in entries {
+                    let func_display = if !self.config.github_base_url.is_empty()
+                        && !entry.file_location.is_empty()
+                    {
                         make_github_link(
                             &entry.func_name,
                             &entry.file_location,
@@ -159,36 +183,52 @@ impl CuBenchmark {
                         format!("`{}`", entry.func_name)
                     };
 
-                writeln!(
-                    f,
-                    "| {:<fw$} | {:>10} | {:>10} |",
-                    func_display,
-                    format_thousands(entry.total_cu),
-                    format_thousands(entry.net_cu),
-                    fw = func_width,
-                )?;
+                    writeln!(
+                        f,
+                        "| {:<fw$} | {:>10} | {:>10} |",
+                        func_display,
+                        format_thousands(entry.total_cu),
+                        format_thousands(entry.net_cu),
+                        fw = func_width,
+                    )?;
+                }
+                writeln!(f)?;
             }
-            writeln!(f)?;
+
+            for table in tables {
+                write_section_table(&mut f, table)?;
+            }
         }
         Ok(())
+    }
+
+    /// All section names, sorted: instructions with CU entries, custom tables,
+    /// or both.
+    fn section_names(&self) -> Vec<&String> {
+        let mut names: Vec<&String> = self.results.keys().chain(self.tables.keys()).collect();
+        names.sort();
+        names.dedup();
+        names
     }
 
     fn write_toc(&self, f: &mut impl Write) -> std::io::Result<()> {
         let has_cu_column = self.config.toc_summary_function.is_some();
 
         let toc_entries: Vec<(usize, String, Option<String>)> = self
-            .results
-            .iter()
+            .section_names()
+            .into_iter()
             .enumerate()
-            .map(|(i, (name, entries))| {
+            .map(|(i, name)| {
                 let anchor = name.to_lowercase().replace(' ', "-").replace('_', "-");
                 let display = self.display_name(name);
                 let link = format!("[{}](#{})", display, anchor);
                 let cu = self.config.toc_summary_function.as_ref().and_then(|func| {
-                    entries
-                        .iter()
-                        .find(|e| e.func_name == *func)
-                        .map(|e| format_thousands(e.total_cu))
+                    self.results.get(name).and_then(|entries| {
+                        entries
+                            .iter()
+                            .find(|e| e.func_name == *func)
+                            .map(|e| format_thousands(e.total_cu))
+                    })
                 });
                 (i + 1, link, cu)
             })
@@ -253,6 +293,56 @@ impl CuBenchmark {
         }
         snake_to_title_case(name)
     }
+}
+
+/// Render a custom section table: bold title, header row, separator, then one
+/// line per row. Each column is sized to its widest cell (header included);
+/// data cells are right-aligned since they are typically numbers or durations.
+fn write_section_table(f: &mut impl Write, table: &SectionTable) -> std::io::Result<()> {
+    if !table.title.is_empty() {
+        writeln!(f, "**{}**", table.title)?;
+    }
+
+    let widths: Vec<usize> = table
+        .headers
+        .iter()
+        .enumerate()
+        .map(|(i, header)| {
+            table
+                .rows
+                .iter()
+                .filter_map(|row| row.get(i))
+                .map(String::len)
+                .chain(std::iter::once(header.len()))
+                .max()
+                .unwrap_or(0)
+        })
+        .collect();
+
+    let header_line: Vec<String> = table
+        .headers
+        .iter()
+        .zip(&widths)
+        .map(|(header, w)| format!("{:<w$}", header, w = w))
+        .collect();
+    writeln!(f, "| {} |", header_line.join(" | "))?;
+
+    let separator: Vec<String> = widths.iter().map(|w| "-".repeat(*w)).collect();
+    writeln!(f, "| {} |", separator.join(" | "))?;
+
+    for row in &table.rows {
+        let cells: Vec<String> = widths
+            .iter()
+            .enumerate()
+            .map(|(i, w)| {
+                let cell = row.get(i).map(String::as_str).unwrap_or("");
+                format!("{:>w$}", cell, w = w)
+            })
+            .collect();
+        writeln!(f, "| {} |", cells.join(" | "))?;
+    }
+    writeln!(f)?;
+    Ok(())
 }
 
 /// Parse profiling entries from program log lines.
@@ -420,6 +510,72 @@ mod tests {
         assert_eq!(entries[0].func_name, "parse_transfer");
         assert_eq!(entries[0].total_cu, 353);
         assert_eq!(entries[0].net_cu, 353);
+    }
+
+    #[test]
+    fn test_write_section_table() {
+        let table = SectionTable {
+            title: "Transaction Size".into(),
+            headers: vec![
+                "ix data (B)".into(),
+                "accounts".into(),
+                "legacy tx (B)".into(),
+            ],
+            rows: vec![vec!["949".into(), "4".into(), "1227".into()]],
+        };
+        let mut buf = Vec::new();
+        write_section_table(&mut buf, &table).unwrap();
+        let rendered = String::from_utf8(buf).unwrap();
+        assert_eq!(
+            rendered,
+            "**Transaction Size**\n\
+             | ix data (B) | accounts | legacy tx (B) |\n\
+             | ----------- | -------- | ------------- |\n\
+             |         949 |        4 |          1227 |\n\n"
+        );
+    }
+
+    #[test]
+    fn test_write_section_table_cell_wider_than_header() {
+        let table = SectionTable {
+            title: "Proving Time".into(),
+            headers: vec!["Total".into()],
+            rows: vec![vec!["1,215 ms".into()], vec!["69 ms".into()]],
+        };
+        let mut buf = Vec::new();
+        write_section_table(&mut buf, &table).unwrap();
+        let rendered = String::from_utf8(buf).unwrap();
+        assert_eq!(
+            rendered,
+            "**Proving Time**\n\
+             | Total    |\n\
+             | -------- |\n\
+             | 1,215 ms |\n\
+             |    69 ms |\n\n"
+        );
+    }
+
+    #[test]
+    fn test_add_table_creates_section_without_cu_entries() {
+        let mut bench = CuBenchmark::new(ReadmeConfig::default());
+        bench.add_from_entries(
+            "fill",
+            vec![ProfileEntry {
+                func_name: "process_fill".into(),
+                file_location: String::new(),
+                total_cu: 100,
+                net_cu: 100,
+            }],
+        );
+        bench.add_table(
+            "cancel",
+            SectionTable {
+                title: "Transaction Size".into(),
+                headers: vec!["legacy tx (B)".into()],
+                rows: vec![vec!["836".into()]],
+            },
+        );
+        assert_eq!(bench.section_names(), ["cancel", "fill"]);
     }
 
     #[test]
