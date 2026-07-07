@@ -13,7 +13,8 @@ pub struct ProfileEntry {
 
 /// A custom table rendered inside an instruction's section, after the CU
 /// table. The title renders as bold text (not a heading), so it produces no
-/// anchor or table-of-contents entry.
+/// anchor or table-of-contents entry. `headers` defines the column count:
+/// row cells beyond it are not rendered, missing cells render empty.
 #[derive(Debug, Clone)]
 pub struct SectionTable {
     pub title: String,
@@ -219,7 +220,7 @@ impl CuBenchmark {
             .into_iter()
             .enumerate()
             .map(|(i, name)| {
-                let anchor = name.to_lowercase().replace(' ', "-").replace('_', "-");
+                let anchor = name.to_lowercase().replace([' ', '_'], "-");
                 let display = self.display_name(name);
                 let link = format!("[{}](#{})", display, anchor);
                 let cu = self.config.toc_summary_function.as_ref().and_then(|func| {
@@ -435,7 +436,7 @@ fn format_thousands(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::with_capacity(s.len() + s.len() / 3);
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             result.push(',');
         }
         result.push(c);
