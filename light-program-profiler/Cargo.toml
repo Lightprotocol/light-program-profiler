@@ -11,12 +11,19 @@ homepage = "https://github.com/Lightprotocol/light-program-profiler"
 profile-program = ["light-profiler-macro/profile-program"]
 profile-heap = ["light-profiler-macro/profile-heap"]
 inline = ["light-profiler-macro/inline"]
-mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm"]
+mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm", "dep:solana-hash"]
 
 [dependencies]
 light-profiler-macro.workspace = true
-solana-program-runtime = { version = "2.3", optional = true }
-mollusk-svm = { version = "0.3.0", optional = true }
+solana-program-runtime = { version = "4.1", optional = true }
+mollusk-svm = { version = "0.14.0", optional = true }
+# Pin solana-hash to the 4.5 line so its wincode 0.5 dependency aligns with the
+# rest of the agave 4.1 graph; 4.6.0 pulls in wincode 0.6 and breaks solana-nonce.
+solana-hash = { version = "=4.5.0", optional = true }
+
+[dev-dependencies]
+solana-instruction = "3.4"
+solana-pubkey = "4.2"
 
 [lints.rust.unexpected_cfgs]
 level = "allow"

@@ -4,12 +4,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 
 use solana_program_runtime::{
-    invoke_context::InvokeContext,
-    solana_sbpf::{
-        declare_builtin_function,
-        memory_region::{AccessType, MemoryMapping},
-        vm::ContextObject,
-    },
+    invoke_context::InvokeContext, memory::translate_slice,
+    solana_sbpf::{declare_builtin_function, vm::ContextObject},
 };
 
 // ---------------------------------------------------------------------------
@@ -168,35 +164,23 @@ thread_local! {
 }
 
 // ---------------------------------------------------------------------------
-// Memory translation (translate_slice is not public in solana-program-runtime 2.x)
-// ---------------------------------------------------------------------------
-
-fn translate_slice<'a>(
-    memory_mapping: &'a MemoryMapping,
-    vm_addr: u64,
-    len: u64,
-) -> Result<&'a [u8], Box<dyn std::error::Error>> {
-    let host_addr: u64 = Result::from(memory_mapping.map(AccessType::Load, vm_addr, len))?;
-    Ok(unsafe { std::slice::from_raw_parts(host_addr as *const u8, len as usize) })
-}
-
-// ---------------------------------------------------------------------------
 // Custom syscalls
 // ---------------------------------------------------------------------------
 
 declare_builtin_function!(
     SyscallLogComputeUnitsStart,
     fn rust(
-        invoke_context: &mut InvokeContext,
+        invoke_context: &mut InvokeContext<'static, 'static>,
         id_addr: u64,
         id_len: u64,
         heap_value: u64,
         with_heap: u64,
         _arg5: u64,
-        memory_mapping: &mut MemoryMapping,
     ) -> Result<u64, Box<dyn std::error::Error>> {
         let current_cu = invoke_context.get_remaining();
-        let buf = translate_slice(memory_mapping, id_addr, id_len)?;
+        let memory_mapping = invoke_context.memory_contexts.memory_mapping()?;
+        let check_aligned = invoke_context.get_check_aligned();
+        let buf = translate_slice::<u8>(memory_mapping, id_addr, id_len, check_aligned)?;
         let id = std::str::from_utf8(buf)?.to_string();
         PROFILING_STATE.with(|state| {
             state
@@ -210,16 +194,17 @@ declare_builtin_function!(
 declare_builtin_function!(
     SyscallLogComputeUnitsEnd,
     fn rust(
-        invoke_context: &mut InvokeContext,
+        invoke_context: &mut InvokeContext<'static, 'static>,
         id_addr: u64,
         id_len: u64,
         heap_value: u64,
         with_heap: u64,
         _arg5: u64,
-        memory_mapping: &mut MemoryMapping,
     ) -> Result<u64, Box<dyn std::error::Error>> {
         let current_cu = invoke_context.get_remaining();
-        let buf = translate_slice(memory_mapping, id_addr, id_len)?;
+        let memory_mapping = invoke_context.memory_contexts.memory_mapping()?;
+        let check_aligned = invoke_context.get_check_aligned();
+        let buf = translate_slice::<u8>(memory_mapping, id_addr, id_len, check_aligned)?;
         let id = std::str::from_utf8(buf)?;
         PROFILING_STATE.with(|state| {
             let _ = state
@@ -239,16 +224,15 @@ declare_builtin_function!(
 pub fn register_profiling_syscalls(mollusk: &mut mollusk_svm::Mollusk) {
     mollusk
         .program_cache
-        .program_runtime_environment
-        .register_function(
-            "sol_log_compute_units_start",
-            SyscallLogComputeUnitsStart::vm,
-        )
+        .register_builtin_function("sol_log_compute_units_start", |loader, name| {
+            loader.register_definition::<SyscallLogComputeUnitsStart>(name)
+        })
         .unwrap();
     mollusk
         .program_cache
-        .program_runtime_environment
-        .register_function("sol_log_compute_units_end", SyscallLogComputeUnitsEnd::vm)
+        .register_builtin_function("sol_log_compute_units_end", |loader, name| {
+            loader.register_definition::<SyscallLogComputeUnitsEnd>(name)
+        })
         .unwrap();
 }
 
@@ -307,11 +291,7 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
 /// let program_id = Pubkey::new_unique();
 /// let mut mollusk = Mollusk::default();
 /// register_profiling_syscalls(&mut mollusk);
-/// mollusk.add_program(
-///     &program_id,
-///     "my_program",
-///     &mollusk_svm::program::loader_keys::LOADER_V3,
-/// );
+/// mollusk.add_program(&program_id, "my_program");
 ///
 /// let mut results = BenchmarkResults::new();
 ///
