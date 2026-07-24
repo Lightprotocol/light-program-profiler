@@ -270,6 +270,42 @@ pub fn take_profiling_results() -> Vec<(String, u64, String)> {
     })
 }
 
+fn parse_profile_id(id: &str) -> (String, String) {
+    if let Some(pos) = id.find('\n') {
+        (id[..pos].to_string(), id[pos + 1..].trim().to_string())
+    } else {
+        (id.to_string(), String::new())
+    }
+}
+
+/// Take profiling results as `ProfileEntry` structs with total and net CU.
+/// Post-processes to compute net CU (total minus children), then clears state.
+#[cfg(feature = "report")]
+pub fn take_profiling_entries() -> Vec<crate::report::ProfileEntry> {
+    PROFILING_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        if state.completed_count() == 0 {
+            return vec![];
+        }
+        state.post_process();
+        let results = state
+            .get_completed()
+            .iter()
+            .map(|entry| {
+                let (func_name, file_location) = parse_profile_id(&entry.id);
+                crate::report::ProfileEntry {
+                    func_name,
+                    file_location,
+                    total_cu: entry.total_cu,
+                    net_cu: entry.net_cu,
+                }
+            })
+            .collect();
+        state.clear();
+        results
+    })
+}
+
 // ---------------------------------------------------------------------------
 // README generation
 // ---------------------------------------------------------------------------
