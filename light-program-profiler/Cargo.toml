@@ -11,7 +11,8 @@ homepage = "https://github.com/Lightprotocol/light-program-profiler"
 profile-program = ["light-profiler-macro/profile-program"]
 profile-heap = ["light-profiler-macro/profile-heap"]
 inline = ["light-profiler-macro/inline"]
-mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm", "dep:solana-hash"]
+report = []
+mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm", "dep:solana-hash", "report"]
 
 [dependencies]
 light-profiler-macro.workspace = true
