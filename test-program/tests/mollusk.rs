@@ -9,11 +9,7 @@ fn test_profiled_program() {
     let program_id = Pubkey::new_unique();
     let mut mollusk = Mollusk::default();
     register_profiling_syscalls(&mut mollusk);
-    mollusk.add_program(
-        &program_id,
-        "test_program",
-        &mollusk_svm::program::loader_keys::LOADER_V3,
-    );
+    mollusk.add_program(&program_id, "test_program");
 
     let instruction = solana_instruction::Instruction::new_with_bytes(program_id, &[5], vec![]);
 
