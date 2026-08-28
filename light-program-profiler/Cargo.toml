@@ -16,10 +16,10 @@ mollusk = ["dep:solana-program-runtime", "dep:mollusk-svm", "dep:solana-hash", "
 
 [dependencies]
 light-profiler-macro.workspace = true
-solana-program-runtime = { version = "4.1", optional = true }
-mollusk-svm = { version = "0.14.0", optional = true }
+solana-program-runtime = { version = "4.2", optional = true }
+mollusk-svm = { version = "0.15.0", optional = true }
 # Pin solana-hash to the 4.5 line so its wincode 0.5 dependency aligns with the
-# rest of the agave 4.1 graph; 4.6.0 pulls in wincode 0.6 and breaks solana-nonce.
+# rest of the agave 4.2 graph; 4.6.0 pulls in wincode 0.6 and breaks solana-nonce.
 solana-hash = { version = "=4.5.0", optional = true }
 
 [dev-dependencies]
